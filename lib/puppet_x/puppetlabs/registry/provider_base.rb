@@ -3,7 +3,7 @@ module PuppetX
 module Puppetlabs
 module Registry
 module ProviderBase
-  def self.define_ffi
+  def self.define_ffi(base)
     extend FFI::Library
 
     ffi_convention :stdcall
@@ -28,7 +28,7 @@ module ProviderBase
     #   _Inout_opt_  LPDWORD lpcbData
     # );
     ffi_lib :advapi32
-    attach_function :RegQueryValueExA,
+    attach_function :RegQueryValueExW,
       [:handle, :pointer, :pointer, :pointer, :pointer, :pointer], :win32_long
 
     # http://msdn.microsoft.com/en-us/library/windows/desktop/ms724847(v=vs.85).aspx
@@ -39,12 +39,48 @@ module ProviderBase
     #   _Reserved_  DWORD Reserved
     # );
     ffi_lib :advapi32
-    attach_function :RegDeleteKeyExA,
+    attach_function :RegDeleteKeyExW,
       [:handle, :pointer, :win32_ulong, :dword], :win32_long
+
+    # https://msdn.microsoft.com/en-us/library/windows/desktop/ms724851(v=vs.85).aspx
+    # LONG WINAPI RegDeleteValue(
+    #   _In_      HKEY hKey,
+    #   _In_opt_  LPCTSTR lpValueName
+    # );
+    ffi_lib :advapi32
+    attach_function :RegDeleteValueW,
+      [:handle, :lpcwstr], :win32_long
+
+    # this duplicates code found in puppet, but necessary for backwards compat
+    class << base
+      def from_string_to_wide_string(str, &block)
+        str = wide_string(str)
+        FFI::MemoryPointer.new(:byte, str.bytesize) do |ptr|
+          ptr.put_array_of_uchar(0, str.bytes.to_a)
+
+          yield ptr
+        end
+
+        # ptr has already had free called, so nothing to return
+        nil
+      end
+
+      def wide_string(str)
+        # if given a nil string, assume caller wants to pass a nil pointer to win32
+        return nil if str.nil?
+        # ruby (< 2.1) does not respect multibyte terminators, so it is possible
+        # for a string to contain a single trailing null byte, followed by garbage
+        # causing buffer overruns.
+        #
+        # See http://svn.ruby-lang.org/cgi-bin/viewvc.cgi?revision=41920&view=revision
+        newstr = str + "\0".encode(str.encoding)
+        newstr.encode!('UTF-16LE')
+      end
+    end
   end
 
   # This is a class method in order to be easily mocked in the spec tests.
-  def self.initialize_system_api
+  def self.initialize_system_api(base)
     if Puppet.features.microsoft_windows?
       begin
         require 'win32/registry'
@@ -58,13 +94,21 @@ module ProviderBase
 
       begin
         require 'ffi'
-        define_ffi
+        define_ffi(base)
       rescue LoadError => exc
         msg = "Could not load the required ffi library [#{exc.message}]"
         Puppet.err msg
         error = Puppet::Error.new(msg)
         error.set_backtrace exc.backtrace
         raise error
+      end
+
+      class << base
+        # TODO: ugh, need to ues a mix-in
+        require 'puppet/util/windows/registry'
+        def RegistryHelpers
+          @registry_helpers ||= Class.new.extend(Puppet::Util::Windows::Registry)
+        end
       end
     end
   end
@@ -73,7 +117,7 @@ module ProviderBase
     # Initialize the Win32 API.  This is a method call so the spec tests can
     # easily mock the initialization of the Win32 libraries on non-win32
     # systems.
-    initialize_system_api
+    initialize_system_api(base)
 
     # Define an hkeys class method in the eigenclass we're being mixed into.
     # This is the one true place to define the root hives we support.
@@ -91,8 +135,16 @@ module ProviderBase
   # The rest of these methods will be mixed in as instance methods into the
   # provider class.  The path method is expected to be mixed in by the provider
   # specific module, ProviderKeyBase or ProviderValueBase
+  def from_string_to_wide_string(str, &block)
+    self.class.from_string_to_wide_string(str, &block)
+  end
+
   def hkeys
     self.class.hkeys
+  end
+
+  def registry_helpers
+    self.class.RegistryHelpers
   end
 
   def hive
@@ -135,6 +187,21 @@ module ProviderBase
     name2type = {}
     type2name_map.each_pair {|k,v| name2type[v] = k}
     name2type[name]
+  end
+
+  def each_value(key, &block)
+    # TODO: this is fixed in Ruby 2.2, but not 2.1 - is this the best way to check
+    # check via RUBY_VERSION =~ /2.1/
+    # or do we check using responds_to?(Puppet::Util::Windows::Registry.each_value)
+    if registry_helpers.respond_to?(:each_value)
+      registry_helpers.each_value(key) do |name, type, data|
+        yield name, type, data
+      end
+    else
+      key.each_value do |name, type, data|
+        yield name, type, data
+      end
+    end
   end
 end
 end
