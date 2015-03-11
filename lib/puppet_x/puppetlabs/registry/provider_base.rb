@@ -198,6 +198,8 @@ module ProviderBase
         yield name, type, data
       end
     else
+      # TODO: expectations around never calling this are not working
+      require 'pry'; binding.pry
       key.each_value do |name, type, data|
         yield name, type, data
       end
