@@ -45,7 +45,7 @@ describe Puppet::Type.type(:registry_key).provider(:registry), :if => Puppet.fea
     end
   end
 
-  describe "#purge_values" do
+  describe "#purge_values", :if => RUBY_VERSION =~ /^2\./ do
     let (:guid) { SecureRandom.uuid }
     let (:reg_path) { "#{puppet_key}\\#{subkey_name}\\Unicode-#{guid}" }
     let (:reg64) { PuppetX::Puppetlabs::Registry::KEY_WOW64_64KEY }
