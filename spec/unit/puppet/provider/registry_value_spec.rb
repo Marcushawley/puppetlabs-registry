@@ -21,15 +21,15 @@ describe Puppet::Type.type(:registry_value).provider(:registry), :if => Puppet.f
     # a local codepage which can totally break when that codepage has no
     # conversion from the given UTF-16LE characters to local codepage
     # a prime example is that IBM437 has no conversion from a Unicode en-dash
-    Win32::Registry.expects(:export_string).never
+    Win32::Registry.any_instance.expects(:export_string).never
 
     # also, expect that we're not using Rubys each_key / each_value which exhibit bad behavior
-    Win32::Registry.expects(:each_key).never
-    Win32::Registry.expects(:each_value).never
+    Win32::Registry.any_instance.expects(:each_key).never
+    Win32::Registry.any_instance.expects(:each_value).never
 
 
-    Win32::Registry.expects(:delete_value).never
-    Win32::Registry.expects(:delete_key).never
+    Win32::Registry.any_instance.expects(:delete_value).never
+    Win32::Registry.any_instance.expects(:delete_key).never
   end
 
   after(:all) do

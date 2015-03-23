@@ -193,17 +193,18 @@ module ProviderBase
     # this is not a problem in Ruby 2.0.0 and below, nor an issue in 2.2
     # The bug with registry was introduced in 2.1 so we use our internal
     # call in Puppet 4.x
-    if registry_helpers.respond_to?(:each_value)
-      registry_helpers.each_value(key) do |name, type, data|
-        yield name, type, data
-      end
-    else
-      # TODO: expectations around never calling this are not working
-      require 'pry'; binding.pry
+    # TODO: This is temporarily commented out to produce the correct error
+    # if registry_helpers.respond_to?(:each_value)
+    #   registry_helpers.each_value(key) do |name, type, data|
+    #     yield name, type, data
+    #   end
+    # else
+      # this should only be hit when Puppet is < 4 - Ruby will be 2.0.0
+      # or lower.
       key.each_value do |name, type, data|
         yield name, type, data
       end
-    end
+    # end
   end
 end
 end
