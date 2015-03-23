@@ -48,6 +48,7 @@ describe Puppet::Type.type(:registry_key).provider(:registry), :if => Puppet.fea
   describe "#purge_values" do
     let (:guid) { SecureRandom.uuid }
     let (:reg_path) { "#{puppet_key}\\#{subkey_name}\\Unicode-#{guid}" }
+    let (:reg64) { PuppetX::Puppetlabs::Registry::KEY_WOW64_64KEY }
 
     def bytes_to_utf8(bytes)
       bytes.pack('c*').force_encoding(Encoding::UTF_8)
@@ -56,7 +57,7 @@ describe Puppet::Type.type(:registry_key).provider(:registry), :if => Puppet.fea
     before(:each) do
       # create temp registry key with Unicode values
       Win32::Registry::HKEY_LOCAL_MACHINE.create(reg_path,
-        Win32::Registry::KEY_ALL_ACCESS) do |reg_key|
+        Win32::Registry::KEY_ALL_ACCESS | reg64) do |reg_key|
           endash = bytes_to_utf8([0xE2, 0x80, 0x93])
           tm = bytes_to_utf8([0xE2, 0x84, 0xA2])
 
