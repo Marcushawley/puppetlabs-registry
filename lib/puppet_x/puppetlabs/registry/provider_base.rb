@@ -104,7 +104,7 @@ module ProviderBase
       end
 
       class << base
-        # TODO: ugh, need to ues a mix-in
+        # ugh - need to use a mix-in
         require 'puppet/util/windows/registry'
         def RegistryHelpers
           @registry_helpers ||= Class.new.extend(Puppet::Util::Windows::Registry)
@@ -190,9 +190,9 @@ module ProviderBase
   end
 
   def each_value(key, &block)
-    # TODO: this is fixed in Ruby 2.2, but not 2.1 - is this the best way to check
-    # check via RUBY_VERSION =~ /2.1/
-    # or do we check using responds_to?(Puppet::Util::Windows::Registry.each_value)
+    # this is not a problem in Ruby 2.0.0 and below, nor an issue in 2.2
+    # The bug with registry was introduced in 2.1 so we use our internal
+    # call in Puppet 4.x
     if registry_helpers.respond_to?(:each_value)
       registry_helpers.each_value(key) do |name, type, data|
         yield name, type, data
